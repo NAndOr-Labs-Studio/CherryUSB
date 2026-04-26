@@ -73,7 +73,11 @@ enum usbh_event_type {
 #ifdef __ARMCC_VERSION /* ARM C Compiler */
 #define CLASS_INFO_DEFINE __attribute__((section("usbh_class_info"))) __USED __ALIGNED(1)
 #elif defined(__GNUC__)
+#if defined(M8C_PLATFORM_PICO)
+#define CLASS_INFO_DEFINE __attribute__((section("usbh_class_info"))) __USED __ALIGNED(1)
+#else
 #define CLASS_INFO_DEFINE __attribute__((section(".usbh_class_info"))) __USED __ALIGNED(1)
+#endif
 #elif defined(__ICCARM__) || defined(__ICCRX__) || defined(__ICCRISCV__)
 #pragma section = ".usbh_class_info"
 #define CLASS_INFO_DEFINE __attribute__((section(".usbh_class_info"))) __USED __ALIGNED(1)

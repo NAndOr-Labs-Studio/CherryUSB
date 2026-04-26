@@ -645,10 +645,17 @@ int usbh_initialize(uint8_t busid, uintptr_t reg_base, usbh_event_handler_t even
     usbh_class_info_table_begin = (struct usbh_class_info *)&usbh_class_info$$Base;
     usbh_class_info_table_end = (struct usbh_class_info *)&usbh_class_info$$Limit;
 #elif defined(__GNUC__)
+#if defined(M8C_PLATFORM_PICO)
+    extern struct usbh_class_info __start_usbh_class_info[];
+    extern struct usbh_class_info __stop_usbh_class_info[];
+    usbh_class_info_table_begin = (struct usbh_class_info *)&__start_usbh_class_info[0];
+    usbh_class_info_table_end = (struct usbh_class_info *)&__stop_usbh_class_info[0];
+#else
     extern uint32_t __usbh_class_info_start__;
     extern uint32_t __usbh_class_info_end__;
     usbh_class_info_table_begin = (struct usbh_class_info *)&__usbh_class_info_start__;
     usbh_class_info_table_end = (struct usbh_class_info *)&__usbh_class_info_end__;
+#endif
 #elif defined(__ICCARM__) || defined(__ICCRX__) || defined(__ICCRISCV__)
     usbh_class_info_table_begin = (struct usbh_class_info *)__section_begin(".usbh_class_info");
     usbh_class_info_table_end = (struct usbh_class_info *)__section_end(".usbh_class_info");

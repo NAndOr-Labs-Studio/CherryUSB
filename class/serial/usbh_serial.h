@@ -7,6 +7,7 @@
 #ifndef USBH_SERIAL_H
 #define USBH_SERIAL_H
 
+#include "usbh_core.h"
 #include "usb_cdc.h"
 
 #define USBH_SERIAL_CTRL_NOCACHE_OFFSET 0

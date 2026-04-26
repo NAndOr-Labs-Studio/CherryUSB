@@ -9,6 +9,28 @@
 #include "hardware/irq.h"
 #include "hardware/structs/usb.h"
 
+#if defined(M8C_PLATFORM_PICO)
+#include "hardware/uart.h"
+
+static void m8_uart0_irq_puts(const char *s)
+{
+    while (*s) {
+        uart_putc_raw(uart0, *s++);
+    }
+}
+
+volatile uint32_t m8_rp2_usb_irq_count __attribute__((weak)) = 0;
+volatile uint32_t m8_rp2_usb_last_ints __attribute__((weak)) = 0;
+volatile uint32_t m8_rp2_usb_last_sie_status __attribute__((weak)) = 0;
+volatile uint32_t m8_rp2_usb_last_sof __attribute__((weak)) = 0;
+volatile uint32_t m8_rp2_usb_int_host_conn_dis __attribute__((weak)) = 0;
+volatile uint32_t m8_rp2_usb_int_buff_status __attribute__((weak)) = 0;
+volatile uint32_t m8_rp2_usb_int_trans_complete __attribute__((weak)) = 0;
+volatile uint32_t m8_rp2_usb_int_rx_timeout __attribute__((weak)) = 0;
+volatile uint32_t m8_rp2_usb_int_stall __attribute__((weak)) = 0;
+volatile uint32_t m8_rp2_usb_int_data_seq __attribute__((weak)) = 0;
+#endif
+
 #define usb_hw_set   hw_set_alias(usb_hw)
 #define usb_hw_clear hw_clear_alias(usb_hw)
 
@@ -335,8 +357,10 @@ int usb_hc_init(struct usbh_bus *bus)
     /*!< Mux the controller to the onboard usb phy */
     usb_hw->muxing = USB_USB_MUXING_TO_PHY_BITS | USB_USB_MUXING_SOFTCON_BITS;
 
-    // Force VBUS detect so the device thinks it is plugged into a host
-    usb_hw->pwr = USB_USB_PWR_VBUS_DETECT_BITS | USB_USB_PWR_VBUS_DETECT_OVERRIDE_EN_BITS;
+    usb_hw->pwr = USB_USB_PWR_VBUS_DETECT_BITS |
+                  USB_USB_PWR_VBUS_DETECT_OVERRIDE_EN_BITS |
+                  USB_USB_PWR_VBUS_EN_BITS |
+                  USB_USB_PWR_VBUS_EN_OVERRIDE_EN_BITS;
 
     // Enable the USB controller in device mode.
     usb_hw->main_ctrl = USB_MAIN_CTRL_CONTROLLER_EN_BITS | USB_MAIN_CTRL_HOST_NDEVICE_BITS;
@@ -757,8 +781,19 @@ void USBH_IRQHandler(uint8_t busid)
     bus = &g_usbhost_bus[busid];
     status = usb_hw->ints;
 
+#if defined(M8C_PLATFORM_PICO)
+    m8_rp2_usb_irq_count++;
+    m8_rp2_usb_last_ints = status;
+    m8_rp2_usb_last_sie_status = usb_hw->sie_status;
+    m8_rp2_usb_last_sof = usb_hw->sof_rd;
+#endif
+
     if (status & USB_INTS_HOST_CONN_DIS_BITS) {
         handled |= USB_INTS_HOST_CONN_DIS_BITS;
+#if defined(M8C_PLATFORM_PICO)
+        m8_rp2_usb_int_host_conn_dis++;
+        m8_uart0_irq_puts("usb irq host_conn_dis\n");
+#endif
         usb_hw_clear->sie_status = USB_SIE_STATUS_SPEED_BITS;
         if (usbh_get_port_speed()) {
             g_rp2040_hcd[bus->hcd.hcd_id].port_csc = 1;
@@ -777,16 +812,25 @@ void USBH_IRQHandler(uint8_t busid)
 
     if (status & USB_INTS_STALL_BITS) {
         handled |= USB_INTS_STALL_BITS;
+#if defined(M8C_PLATFORM_PICO)
+        m8_rp2_usb_int_stall++;
+#endif
         usb_hw_clear->sie_status = USB_SIE_STATUS_STALL_REC_BITS;
     }
 
     if (status & USB_INTS_BUFF_STATUS_BITS) {
         handled |= USB_INTS_BUFF_STATUS_BITS;
+#if defined(M8C_PLATFORM_PICO)
+        m8_rp2_usb_int_buff_status++;
+#endif
         rp2040_handle_buffer_status(bus);
     }
 
     if (status & USB_INTS_TRANS_COMPLETE_BITS) {
         handled |= USB_INTS_TRANS_COMPLETE_BITS;
+#if defined(M8C_PLATFORM_PICO)
+        m8_rp2_usb_int_trans_complete++;
+#endif
         usb_hw_clear->sie_status = USB_SIE_STATUS_TRANS_COMPLETE_BITS;
         if (usb_hw->sie_ctrl & USB_SIE_CTRL_SEND_SETUP_BITS) {
             pipe = (struct rp2040_pipe *)&g_rp2040_hcd[bus->hcd.hcd_id].pipe_pool[0];
@@ -810,11 +854,17 @@ void USBH_IRQHandler(uint8_t busid)
 
     if (status & USB_INTS_ERROR_RX_TIMEOUT_BITS) {
         handled |= USB_INTS_ERROR_RX_TIMEOUT_BITS;
+#if defined(M8C_PLATFORM_PICO)
+        m8_rp2_usb_int_rx_timeout++;
+#endif
         usb_hw_clear->sie_status = USB_SIE_STATUS_RX_TIMEOUT_BITS;
     }
 
     if (status & USB_INTS_ERROR_DATA_SEQ_BITS) {
         handled |= USB_INTS_ERROR_DATA_SEQ_BITS;
+#if defined(M8C_PLATFORM_PICO)
+        m8_rp2_usb_int_data_seq++;
+#endif
         usb_hw_clear->sie_status = USB_SIE_STATUS_DATA_SEQ_ERROR_BITS;
     }
 
